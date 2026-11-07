@@ -57,28 +57,40 @@ fn run_cmd(bin: &Path, args: &[&str], apply: bool) -> Result<String, PlymouthErr
     if !apply {
         return Ok(String::new());
     }
-    let output = Command::new(bin)
-        .args(args)
-        .output()
-        .map_err(|e| PlymouthError::CommandFailed(e.to_string()))?;
-    if !output.status.success() {
-        return Err(PlymouthError::CommandFailed(
-            String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        ));
+    for _ in 0..20 {
+        let output = Command::new(bin)
+            .args(args)
+            .output()
+            .map_err(|e| PlymouthError::CommandFailed(e.to_string()))?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if err.contains("Text file busy") {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            continue;
+        }
+        return Err(PlymouthError::CommandFailed(err));
     }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    Err(PlymouthError::CommandFailed(String::from("Text file busy")))
 }
 
 fn current_theme(bin: &Path) -> Result<String, PlymouthError> {
-    let output = Command::new(bin)
-        .output()
-        .map_err(|e| PlymouthError::CommandFailed(e.to_string()))?;
-    if !output.status.success() {
-        return Err(PlymouthError::CommandFailed(
-            String::from_utf8_lossy(&output.stderr).trim().to_string(),
-        ));
+    for _ in 0..20 {
+        let output = Command::new(bin)
+            .output()
+            .map_err(|e| PlymouthError::CommandFailed(e.to_string()))?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).trim().to_string());
+        }
+        let err = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if err.contains("Text file busy") {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+            continue;
+        }
+        return Err(PlymouthError::CommandFailed(err));
     }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    Err(PlymouthError::CommandFailed(String::from("Text file busy")))
 }
 
 pub fn plymouth_install(opts: PlymouthInstallOptions) -> Result<Vec<String>, PlymouthError> {
@@ -170,6 +182,7 @@ mod tests {
         );
         fs::write(&path, body).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(100));
         path
     }
 
