@@ -1,5 +1,8 @@
 ![bootlogo-forge hero](assets/hero.svg)
 
+> **Work in progress.** This project is unfinished, may change, and is not
+> recommended for production use.
+
 # bootlogo-forge
 
 Replace the boot logo shown after firmware POST on Acer laptops (InsydeH2O firmware,
