@@ -22,7 +22,7 @@ through their BGRT handling. A firmware update may replace the firmware logo.
 
 ## Requirements
 
-- Acer first. Lenovo, Dell and HP use the BGRT path.
+- Vendor detection selects the BGRT backend; Lenovo native support is opt-in.
 - Secure Boot off, or enrollment of the binary hash via MOK (not automated).
 - ACPI BGRT present.
 
