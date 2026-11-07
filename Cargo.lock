@@ -93,6 +93,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bootlogo-forge-e2e-payload"
+version = "0.1.0"
+dependencies = [
+ "uefi",
+ "uefi-raw",
+]
+
+[[package]]
 name = "bootlogo-forge-efi"
 version = "0.1.0"
 dependencies = [
