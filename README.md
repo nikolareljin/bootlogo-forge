@@ -1,3 +1,5 @@
+![bootlogo-forge hero](assets/hero.svg)
+
 # bootlogo-forge
 
 Replace the boot logo shown after firmware POST on Acer laptops (InsydeH2O firmware,
