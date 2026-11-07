@@ -28,11 +28,12 @@
     <circle cx="38" cy="173" r="5" fill="#22c55e"/>
     <text x="56" y="178" fill="#cbd5e1" font-family="ui-monospace, monospace" font-size="12">EFI -> ACPI BGRT -> logo.bmp</text>
   </g>
-  <text x="500" y="154" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="80" font-weight="800" letter-spacing="-.03em">bootlogo-forge</text>
-  <text x="502" y="210" fill="#a5b4fc" font-family="system-ui, sans-serif" font-size="30" font-weight="500">Replace the boot logo with your own image</text>
-  <text x="502" y="255" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="20">ACPI BGRT on UEFI: vendor detection selects the BGRT backend.</text>
-  <text x="502" y="282" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="18">Lenovo native support is opt-in. Linux installer with dry-run default.</text>
-  <text x="502" y="312" fill="#64748b" font-family="system-ui, sans-serif" font-size="16">The firmware logo shown during POST is not changed.</text>
+  <text x="500" y="150" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="76" font-weight="800" letter-spacing="-.03em">bootlogo-forge</text>
+  <text x="502" y="202" fill="#a5b4fc" font-family="system-ui, sans-serif" font-size="28" font-weight="500">Replace the boot logo</text>
+  <text x="502" y="236" fill="#a5b4fc" font-family="system-ui, sans-serif" font-size="28" font-weight="500">with your own image</text>
+  <text x="502" y="278" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="18">ACPI BGRT on UEFI.</text>
+  <text x="502" y="304" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="18">Vendor detection selects the BGRT backend.</text>
+  <text x="502" y="330" fill="#64748b" font-family="system-ui, sans-serif" font-size="16">Linux installer. Dry run by default.</text>
   <rect x="502" y="340" width="180" height="4" rx="2" fill="#6366f1"/>
   <rect x="690" y="340" width="110" height="4" rx="2" fill="#334155"/>
 </svg>
