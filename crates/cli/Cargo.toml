@@ -7,3 +7,9 @@ license.workspace = true
 [dependencies]
 bootlogo-forge-core = { path = "../core" }
 clap = { version = "4.6", features = ["derive"] }
+
+[lib]
+doctest = false
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }

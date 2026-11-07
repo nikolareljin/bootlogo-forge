@@ -32,4 +32,18 @@ Detection:
 
     bootlogo-forge detect
 
+Install (dry run; add --apply to change anything):
+
+    bootlogo-forge install --image ./logo.png
+
+Uninstall:
+
+    bootlogo-forge uninstall
+
+Status:
+
+    bootlogo-forge status
+
 Supported vendors: acer, lenovo, dell, hp, unknown.
+Uninstall restores the saved boot order. Firmware boot menu (F12 on Acer)
+acts as recovery.
