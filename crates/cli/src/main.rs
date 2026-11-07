@@ -98,6 +98,13 @@ fn main() -> ExitCode {
             efibootmgr,
             sysfs_root,
         } => {
+            let esp = esp.or_else(|| {
+                if PathBuf::from("/boot/efi").is_dir() {
+                    Some(PathBuf::from("/boot/efi"))
+                } else {
+                    bootlogo_forge::findmnt_esp()
+                }
+            });
             let opts = StatusOptions {
                 esp,
                 efibootmgr,
@@ -132,7 +139,13 @@ fn main() -> ExitCode {
                 println!("would copy a logo BMP to the ESP root for a ThinkPad");
                 return ExitCode::SUCCESS;
             }
-            let esp_path = esp.unwrap_or_else(|| PathBuf::from("/boot/efi"));
+            let esp_path = esp.unwrap_or_else(|| {
+                if PathBuf::from("/boot/efi").is_dir() {
+                    PathBuf::from("/boot/efi")
+                } else {
+                    bootlogo_forge::findmnt_esp().unwrap_or_else(|| PathBuf::from("/boot/efi"))
+                }
+            });
             let opts = InstallOptions {
                 image,
                 esp: esp_path.clone(),
@@ -187,7 +200,13 @@ fn main() -> ExitCode {
             update_initramfs,
             apply,
         } => {
-            let esp_path = esp.unwrap_or_else(|| PathBuf::from("/boot/efi"));
+            let esp_path = esp.unwrap_or_else(|| {
+                if PathBuf::from("/boot/efi").is_dir() {
+                    PathBuf::from("/boot/efi")
+                } else {
+                    bootlogo_forge::findmnt_esp().unwrap_or_else(|| PathBuf::from("/boot/efi"))
+                }
+            });
             let opts = UninstallOptions {
                 esp: esp_path.clone(),
                 efibootmgr,
