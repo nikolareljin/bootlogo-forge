@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/core", "crates/cli", "crates/efi"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["Nik Reljin"]
+
+[workspace.dependencies]
+# shared dependencies go here as needed
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
