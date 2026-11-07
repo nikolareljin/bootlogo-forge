@@ -1,31 +1,37 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="bootlogo-forge hero image">
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="420" viewBox="0 0 1280 420" role="img" aria-label="bootlogo-forge">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#0f172a"/>
-      <stop offset="0.55" stop-color="#111827"/>
-      <stop offset="1" stop-color="#1e1b4b"/>
+      <stop offset=".6" stop-color="#111827"/>
+      <stop offset="1" stop-color="#312e81"/>
     </linearGradient>
     <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#6366f1"/>
-      <stop offset="1" stop-color="#22c55e"/>
+      <stop offset="0" stop-color="#818cf8"/>
+      <stop offset="1" stop-color="#34d399"/>
     </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
   </defs>
   <rect width="1280" height="420" fill="url(#bg)"/>
-  <g opacity="0.12" stroke="#cbd5e1">
-    <path d="M0 340 L1280 340"/>
-    <path d="M0 300 L1280 300"/>
+  <g opacity=".08" stroke="#cbd5e1">
+    <path d="M0 330h1280M0 290h1280M0 250h1280"/>
   </g>
-  <g transform="translate(90,72)">
-    <rect width="360" height="210" rx="22" fill="#020617" stroke="#6366f1" stroke-width="3"/>
-    <rect x="24" y="24" width="312" height="138" rx="12" fill="#1e293b"/>
-    <path d="M120 90 L230 90" stroke="#22c55e" stroke-width="6" stroke-linecap="round"/>
-    <text x="180" y="62" text-anchor="middle" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="26" font-weight="700">BGRT</text>
-    <text x="180" y="145" text-anchor="middle" fill="#94a3b8" font-family="system-ui, sans-serif" font-size="14">your logo appears here</text>
+  <g transform="translate(86,78)" filter="url(#glow)">
+    <rect width="330" height="205" rx="18" fill="#020617" stroke="#6366f1" stroke-width="2"/>
+    <rect x="18" y="18" width="294" height="122" rx="10" fill="#0f172a" stroke="#334155"/>
+    <rect x="40" y="52" width="190" height="7" rx="3.5" fill="url(#bar)"/>
+    <rect x="40" y="82" width="254" height="7" rx="3.5" fill="#334155"/>
+    <rect x="40" y="112" width="150" height="7" rx="3.5" fill="#334155"/>
+    <rect x="20" y="158" width="290" height="30" rx="8" fill="#1e293b"/>
+    <circle cx="38" cy="173" r="5" fill="#22c55e"/>
+    <text x="56" y="178" fill="#cbd5e1" font-family="ui-monospace, monospace" font-size="12">EFI -> ACPI BGRT -> logo.bmp</text>
   </g>
-  <text x="520" y="150" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="74" font-weight="800">bootlogo-forge</text>
-  <text x="520" y="205" fill="#a5b4fc" font-family="system-ui, sans-serif" font-size="30">Replace the boot logo via ACPI BGRT</text>
-  <rect x="520" y="235" width="420" height="8" rx="4" fill="#1f2937"/>
-  <rect x="520" y="235" width="280" height="8" rx="4" fill="url(#bar)"/>
-  <text x="520" y="285" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="20">Acer first. Lenovo, Dell and HP use the BGRT path.</text>
-  <text x="520" y="325" fill="#64748b" font-family="system-ui, sans-serif" font-size="18">Linux installer for EFI systems. Dry run by default.</text>
+  <text x="500" y="154" fill="#f8fafc" font-family="system-ui, sans-serif" font-size="80" font-weight="800" letter-spacing="-.03em">bootlogo-forge</text>
+  <text x="502" y="210" fill="#a5b4fc" font-family="system-ui, sans-serif" font-size="30" font-weight="500">Replace the boot logo with your own image</text>
+  <text x="502" y="260" fill="#cbd5e1" font-family="system-ui, sans-serif" font-size="20">ACPI BGRT on UEFI: Acer first; Lenovo, Dell, and HP use the BGRT path.</text>
+  <text x="502" y="312" fill="#64748b" font-family="system-ui, sans-serif" font-size="18">Linux installer. Dry run by default. Firmware POST logo remains unchanged.</text>
+  <rect x="502" y="340" width="180" height="4" rx="2" fill="#6366f1"/>
+  <rect x="690" y="340" width="110" height="4" rx="2" fill="#334155"/>
 </svg>
