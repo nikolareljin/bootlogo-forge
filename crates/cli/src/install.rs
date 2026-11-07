@@ -176,16 +176,16 @@ pub fn install(opts: InstallOptions) -> Result<Vec<String>, InstallError> {
     let target_dir = opts.esp.join("EFI").join("bootlogo-forge");
     let target_existed_before = target_dir.exists();
 
-    // writability check
-    fs::create_dir_all(opts.esp.join("EFI")).map_err(io_err)?;
-    // try creating target
-    if !target_dir.exists() {
-        fs::create_dir_all(&target_dir).map_err(|_| InstallError::ReadOnlyEsp)?;
-    } else {
-        // test writability with temp file
-        let test_path = target_dir.join(".write_test");
-        fs::write(&test_path, b"").map_err(|_| InstallError::ReadOnlyEsp)?;
-        let _ = fs::remove_file(&test_path);
+    // writability check only for actual writes
+    if opts.apply {
+        fs::create_dir_all(opts.esp.join("EFI")).map_err(io_err)?;
+        if !target_dir.exists() {
+            fs::create_dir_all(&target_dir).map_err(|_| InstallError::ReadOnlyEsp)?;
+        } else {
+            let test_path = target_dir.join(".write_test");
+            fs::write(&test_path, b"").map_err(|_| InstallError::ReadOnlyEsp)?;
+            let _ = fs::remove_file(&test_path);
+        }
     }
 
     let efi_app = match &opts.efi_app {

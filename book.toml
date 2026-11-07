@@ -1,0 +1,8 @@
+[book]
+authors = ["Nik Reljin"]
+language = "en"
+src = "docs"
+title = "bootlogo-forge"
+
+[output.html]
+git-repository-url = "https://github.com/nikolareljin/bootlogo-forge"
