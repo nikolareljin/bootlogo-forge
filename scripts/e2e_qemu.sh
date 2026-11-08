@@ -22,7 +22,7 @@ fi
 
 ESP="$WORK/esp"
 mkdir -p "$ESP/EFI/BOOT"
-cp "$PAYLOAD" "$ESP/EFI/BOOT/payload.efi"
+cp "$PAYLOAD" "$ESP/EFI/BOOT/shimx64.efi"
 
 mkdir -p "$WORK/bin"
 STUB="$WORK/bin/efibootmgr"
