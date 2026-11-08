@@ -231,9 +231,8 @@ pub fn resolve_esp_device(
             "could not find parent disk",
         )));
     }
-    let part = parse_trailing_number(&dev).ok_or_else(|| {
-        InstallError::EspDevice(String::from("could not parse partition number"))
-    })?;
+    let part = parse_trailing_number(&dev)
+        .ok_or_else(|| InstallError::EspDevice(String::from("could not parse partition number")))?;
     Ok((PathBuf::from(format!("/dev/{}", pk)), part))
 }
 
@@ -389,15 +388,19 @@ pub fn install(opts: InstallOptions) -> Result<Vec<String>, InstallError> {
                 created_entry: created.clone(),
                 loader: chain_loader.clone(),
             };
-            let payload = serde_json::to_string(&backup)
-                .map_err(|e| InstallError::Parse(e.to_string()))?;
+            let payload =
+                serde_json::to_string(&backup).map_err(|e| InstallError::Parse(e.to_string()))?;
             fs::write(&backup_path, payload).map_err(io_err)?;
         }
 
         // copy files
         fs::copy(&efi_app, target_dir.join(EFI_APP_NAME)).map_err(io_err)?;
         fs::write(target_dir.join(LOGO_NAME), &bmp).map_err(io_err)?;
-        fs::write(target_dir.join(CONFIG_NAME), format!("loader={}\n", chain_loader)).map_err(io_err)?;
+        fs::write(
+            target_dir.join(CONFIG_NAME),
+            format!("loader={}\n", chain_loader),
+        )
+        .map_err(io_err)?;
 
         // set boot order
         let mut new_order = vec![created.clone()];
@@ -468,8 +471,8 @@ pub fn uninstall(opts: UninstallOptions) -> Result<Vec<String>, InstallError> {
     }
 
     // delete matching entry
-    let entry_to_delete =
-        created_entry.or_else(|| find_entry_number(&opts.efibootmgr, ENTRY_LABEL, EFI_ENTRY_LOADER));
+    let entry_to_delete = created_entry
+        .or_else(|| find_entry_number(&opts.efibootmgr, ENTRY_LABEL, EFI_ENTRY_LOADER));
     if let Some(entry) = &entry_to_delete {
         mutate(
             &opts.efibootmgr,
@@ -539,8 +542,6 @@ pub fn findmnt_esp() -> Option<PathBuf> {
         Some(PathBuf::from(line))
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {
