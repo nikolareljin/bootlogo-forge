@@ -97,6 +97,7 @@ version = "0.1.0"
 dependencies = [
  "bootlogo-forge-core",
  "uefi",
+ "uefi-raw",
 ]
 
 [[package]]
