@@ -5,7 +5,6 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 export PATH="$HOME/.cargo/bin:$PATH"
-export RUSTC="$(rustup which --toolchain stable rustc)"
 
 mdbook build
 
@@ -29,7 +28,7 @@ print("links ok")
 PY
 
 # Safe commands against the built binary.
-rustup run stable cargo build -p bootlogo-forge >/dev/null
+cargo build -p bootlogo-forge >/dev/null
 BIN="$ROOT/target/debug/bootlogo-forge"
 test -x "$BIN"
 

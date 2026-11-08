@@ -15,3 +15,4 @@ doctest = false
 
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
+tempfile = "3"
