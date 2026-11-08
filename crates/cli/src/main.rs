@@ -43,6 +43,12 @@ enum Commands {
         efibootmgr: PathBuf,
         #[arg(long)]
         efi_app: Option<PathBuf>,
+        #[arg(long, default_value = "/usr/bin/plymouth-set-default-theme")]
+        plymouth_set_default_theme: PathBuf,
+        #[arg(long, default_value = "/usr/sbin/update-initramfs")]
+        update_initramfs: PathBuf,
+        #[arg(long)]
+        plymouth: bool,
         #[arg(long)]
         apply: bool,
     },
@@ -51,6 +57,10 @@ enum Commands {
         esp: Option<PathBuf>,
         #[arg(long, default_value = "/usr/bin/efibootmgr")]
         efibootmgr: PathBuf,
+        #[arg(long, default_value = "/usr/bin/plymouth-set-default-theme")]
+        plymouth_set_default_theme: PathBuf,
+        #[arg(long, default_value = "/usr/sbin/update-initramfs")]
+        update_initramfs: PathBuf,
         #[arg(long)]
         apply: bool,
     },
@@ -101,11 +111,15 @@ fn main() -> ExitCode {
             esp,
             efibootmgr,
             efi_app,
+            plymouth_set_default_theme,
+            update_initramfs,
+            plymouth,
             apply,
         } => {
+            let esp_path = esp.unwrap_or_else(|| PathBuf::from("/boot/efi"));
             let opts = InstallOptions {
                 image,
-                esp: esp.unwrap_or_else(|| PathBuf::from("/boot/efi")),
+                esp: esp_path.clone(),
                 efibootmgr,
                 efi_app,
                 dry_run: !apply,
@@ -116,6 +130,27 @@ fn main() -> ExitCode {
                 Ok(actions) => {
                     for a in actions {
                         println!("{}", a);
+                    }
+                    if plymouth {
+                        let popts = bootlogo_forge::PlymouthInstallOptions {
+                            esp: esp_path,
+                            set_theme_bin: plymouth_set_default_theme,
+                            update_initramfs_bin: update_initramfs,
+                            dry_run: !apply,
+                            apply,
+                            is_root: is_root(),
+                        };
+                        match bootlogo_forge::plymouth_install(popts) {
+                            Ok(pa) => {
+                                for a in pa {
+                                    println!("{}", a);
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("{}", e);
+                                return ExitCode::FAILURE;
+                            }
+                        }
                     }
                     ExitCode::SUCCESS
                 }
@@ -132,10 +167,13 @@ fn main() -> ExitCode {
         Commands::Uninstall {
             esp,
             efibootmgr,
+            plymouth_set_default_theme,
+            update_initramfs,
             apply,
         } => {
+            let esp_path = esp.unwrap_or_else(|| PathBuf::from("/boot/efi"));
             let opts = UninstallOptions {
-                esp: esp.unwrap_or_else(|| PathBuf::from("/boot/efi")),
+                esp: esp_path.clone(),
                 efibootmgr,
                 dry_run: !apply,
                 apply,
@@ -145,6 +183,32 @@ fn main() -> ExitCode {
                 Ok(actions) => {
                     for a in actions {
                         println!("{}", a);
+                    }
+                    if esp_path
+                        .join("EFI")
+                        .join("bootlogo-forge")
+                        .join("plymouth-theme")
+                        .exists()
+                    {
+                        let popts = bootlogo_forge::PlymouthUninstallOptions {
+                            esp: esp_path,
+                            set_theme_bin: plymouth_set_default_theme,
+                            update_initramfs_bin: update_initramfs,
+                            dry_run: !apply,
+                            apply,
+                            is_root: is_root(),
+                        };
+                        match bootlogo_forge::plymouth_uninstall(popts) {
+                            Ok(pa) => {
+                                for a in pa {
+                                    println!("{}", a);
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("{}", e);
+                                return ExitCode::FAILURE;
+                            }
+                        }
                     }
                     ExitCode::SUCCESS
                 }
