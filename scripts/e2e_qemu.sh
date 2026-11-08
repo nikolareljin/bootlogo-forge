@@ -68,7 +68,7 @@ run_case() {
     local serial="$WORK/serial-$case_name.log"
     rm -f "$serial"
     if [ "$logo_present" = "no" ]; then
-        rm -f "$ESP/EFI/bootlogo-forge/logo.bmp"
+        if [ "$(id -u)" -ne 0 ]; then sudo rm -f "$ESP/EFI/bootlogo-forge/logo.bmp"; else rm -f "$ESP/EFI/bootlogo-forge/logo.bmp"; fi
     fi
     timeout 120 qemu-system-x86_64 \
         -machine q35 -m 256 -display none -nographic \
