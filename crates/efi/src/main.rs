@@ -9,12 +9,12 @@ mod imp {
     use alloc::string::String;
     use alloc::vec::Vec;
     use core::ptr;
-        use uefi::boot::{self, AllocateType, ScopedProtocol};
+    use uefi::boot::{self, AllocateType, ScopedProtocol};
     use uefi::fs::FileSystem;
     use uefi::proto::console::gop::GraphicsOutput;
-    use uefi::proto::device_path::DevicePath;
     use uefi::proto::device_path::build;
     use uefi::proto::device_path::build::DevicePathBuilder;
+    use uefi::proto::device_path::DevicePath;
     use uefi::proto::media::fs::SimpleFileSystem;
     use uefi::{CString16, Handle, Status};
     use uefi_raw::table::boot::MemoryType;
@@ -73,7 +73,12 @@ mod imp {
         ) {
             Ok(p) => p.as_ptr() as u64,
             Err(_) => {
-                unsafe { let _ = boot::free_pages(core::ptr::NonNull::new_unchecked(image_addr as *mut u8), pages); };
+                unsafe {
+                    let _ = boot::free_pages(
+                        core::ptr::NonNull::new_unchecked(image_addr as *mut u8),
+                        pages,
+                    );
+                };
                 return Err(());
             }
         };
@@ -88,8 +93,18 @@ mod imp {
         }
 
         if let Err(()) = update_xsdt(table_addr) {
-            unsafe { let _ = boot::free_pages(core::ptr::NonNull::new_unchecked(table_addr as *mut u8), table_pages); };
-            unsafe { let _ = boot::free_pages(core::ptr::NonNull::new_unchecked(image_addr as *mut u8), pages); };
+            unsafe {
+                let _ = boot::free_pages(
+                    core::ptr::NonNull::new_unchecked(table_addr as *mut u8),
+                    table_pages,
+                );
+            };
+            unsafe {
+                let _ = boot::free_pages(
+                    core::ptr::NonNull::new_unchecked(image_addr as *mut u8),
+                    pages,
+                );
+            };
             return Err(());
         }
         let _ = BGRT_LEN;
@@ -288,9 +303,9 @@ mod imp {
             Ok(v) => v,
             Err(_) => return Status::INVALID_PARAMETER,
         };
-        if let Ok(loaded) = boot::open_protocol_exclusive::<uefi::proto::loaded_image::LoadedImage>(
-            image_handle,
-        ) {
+        if let Ok(loaded) =
+            boot::open_protocol_exclusive::<uefi::proto::loaded_image::LoadedImage>(image_handle)
+        {
             if let Some(dev) = loaded.device() {
                 if let Ok(base_dp) = boot::open_protocol_exclusive::<DevicePath>(dev) {
                     let mut buf = [core::mem::MaybeUninit::uninit(); 256];
@@ -298,10 +313,9 @@ mod imp {
                         .push(&build::media::FilePath { path_name: &cpath })
                         .and_then(|b| b.finalize())
                     {
-                        if let Ok(util_handle) =
-                            boot::get_handle_for_protocol::<uefi::proto::device_path::util::DevicePathUtilities>(
-                            )
-                        {
+                        if let Ok(util_handle) = boot::get_handle_for_protocol::<
+                            uefi::proto::device_path::util::DevicePathUtilities,
+                        >() {
                             if let Ok(util) = boot::open_protocol_exclusive::<
                                 uefi::proto::device_path::util::DevicePathUtilities,
                             >(util_handle)
