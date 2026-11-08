@@ -53,8 +53,6 @@ enum Commands {
         plymouth_set_default_theme: PathBuf,
         #[arg(long, default_value = "/usr/sbin/update-initramfs")]
         update_initramfs: PathBuf,
-        #[arg(long, value_enum, default_value = "bgrt")]
-        backend: BackendChoice,
         #[arg(long)]
         plymouth: bool,
         #[arg(long)]
@@ -72,12 +70,6 @@ enum Commands {
         #[arg(long)]
         apply: bool,
     },
-}
-
-#[derive(clap::ValueEnum, Clone, Debug)]
-enum BackendChoice {
-    Bgrt,
-    LenovoNative,
 }
 
 fn is_root() -> bool {
@@ -137,17 +129,9 @@ fn main() -> ExitCode {
             efi_app,
             plymouth_set_default_theme,
             update_initramfs,
-            backend,
             plymouth,
             apply,
         } => {
-            if matches!(backend, BackendChoice::LenovoNative) {
-                println!(
-                    "backend: lenovo-native (dry-run; vendor native ESP logo is not automated)"
-                );
-                println!("would copy a logo BMP to the ESP root for a ThinkPad");
-                return ExitCode::SUCCESS;
-            }
             let esp_path = esp.unwrap_or_else(|| {
                 if PathBuf::from("/boot/efi").is_dir() {
                     PathBuf::from("/boot/efi")

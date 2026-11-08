@@ -5,11 +5,10 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-export RUSTC="$(rustup which --toolchain stable rustc)"
 
 echo "Building EFI app and payload..."
-rustup run stable cargo build -p bootlogo-forge-efi --target x86_64-unknown-uefi --manifest-path "$REPO_ROOT/Cargo.toml"
-rustup run stable cargo build -p bootlogo-forge-e2e-payload --target x86_64-unknown-uefi --manifest-path "$REPO_ROOT/Cargo.toml"
+cargo build -p bootlogo-forge-efi --target x86_64-unknown-uefi --manifest-path "$REPO_ROOT/Cargo.toml"
+cargo build -p bootlogo-forge-e2e-payload --target x86_64-unknown-uefi --manifest-path "$REPO_ROOT/Cargo.toml"
 
 EFI_APP="$REPO_ROOT/target/x86_64-unknown-uefi/debug/bootlogo-forge-efi.efi"
 PAYLOAD="$REPO_ROOT/target/x86_64-unknown-uefi/debug/payload.efi"

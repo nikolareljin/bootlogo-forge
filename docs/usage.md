@@ -57,14 +57,6 @@ Flags:
     --esp PATH                override the ESP mount
     --efi-app PATH            override the EFI application binary
     --plymouth                also set the Plymouth bgrt theme
-    --backend bgrt            default backend
-
-Lenovo native backend is opt-in and dry-run only:
-
-    $ bootlogo-forge install --backend lenovo-native --image ./logo.png
-    backend: lenovo-native (dry-run; vendor native ESP logo is not automated)
-    would copy a logo BMP to the ESP root for a ThinkPad
-
 ## uninstall
 
 Dry run:

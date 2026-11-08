@@ -8,6 +8,6 @@ license = "MIT"
 name = "payload"
 path = "src/main.rs"
 
-[dependencies]
+[target.'cfg(target_os = "uefi")'.dependencies]
 uefi = { version = "0.41", default-features = false, features = ["alloc", "global_allocator", "panic_handler"] }
 uefi-raw = "0.17"

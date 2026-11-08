@@ -47,14 +47,12 @@ impl fmt::Display for Vendor {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Backend {
     Bgrt,
-    LenovoNative,
 }
 
 impl fmt::Display for Backend {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Bgrt => f.write_str("bgrt"),
-            Self::LenovoNative => f.write_str("lenovo-native"),
         }
     }
 }
@@ -113,10 +111,10 @@ mod tests {
     fn acer() {
         let d = temp_dir("t1");
         write(&d, "sys_vendor", "Acer");
-        write(&d, "product_name", "TravelMate P614-51-G2");
+        write(&d, "product_name", "Example Model");
         let det = detect(&d);
         assert_eq!(det.vendor, Vendor::Acer);
-        assert_eq!(det.model, "TravelMate P614-51-G2");
+        assert_eq!(det.model, "Example Model");
     }
 
     #[test]
