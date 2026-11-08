@@ -30,6 +30,21 @@ impl std::error::Error for ImagePipelineError {}
 const MAX_INPUT_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DIMENSION: u32 = 16384;
 
+pub fn parse_dimensions(input: &[u8]) -> Result<(u32, u32), ImagePipelineError> {
+    if input.is_empty() {
+        return Err(ImagePipelineError::EmptyInput);
+    }
+    if input.len() > MAX_INPUT_BYTES {
+        return Err(ImagePipelineError::OversizedInput);
+    }
+    let decoded = image::load_from_memory(input)
+        .map_err(|e: ImgError| ImagePipelineError::Decode(e.to_string()))?;
+    if decoded.width() == 0 || decoded.height() == 0 {
+        return Err(ImagePipelineError::Decode(String::from("zero-size image")));
+    }
+    Ok((decoded.width(), decoded.height()))
+}
+
 pub fn render_bmp(input: &[u8], width: u32, height: u32) -> Result<Vec<u8>, ImagePipelineError> {
     if input.is_empty() {
         return Err(ImagePipelineError::EmptyInput);
