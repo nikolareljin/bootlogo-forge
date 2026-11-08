@@ -38,8 +38,8 @@
   <g opacity=".08" stroke="#cbd5e1">
     <path d="M0 330h1280M0 290h1280M0 250h1280"/>
   </g>
-  <g transform="translate(118,92) scale(1.55)" filter="url(#glow)">
-    <use href="#logomark" xlink:href="#logomark"/>
+  <g transform="translate(60,70) scale(2.2)" filter="url(#glow)">
+    <use href="#logomark" xlink:href="#logomark" width="128" height="128"/>
   </g>
   <g transform="translate(118,318)">
     <rect width="276" height="34" rx="9" fill="#1e293b"/>

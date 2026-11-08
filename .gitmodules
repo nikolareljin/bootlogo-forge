@@ -2,7 +2,3 @@
 	path = third_party/script-helpers
 	url = https://github.com/nikolareljin/script-helpers.git
 	branch = production
-[submodule "third_party/ci-helpers"]
-	path = third_party/ci-helpers
-	url = https://github.com/nikolareljin/ci-helpers.git
-	branch = production
