@@ -3,7 +3,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+trap 'if [ "$(id -u)" -ne 0 ]; then sudo rm -rf "$WORK" 2>/dev/null || true; else rm -rf "$WORK"; fi' EXIT
 
 echo "Building EFI app, payload and CLI..."
 cargo build -p bootlogo-forge-efi --target x86_64-unknown-uefi --manifest-path "$REPO_ROOT/Cargo.toml"
@@ -60,6 +60,7 @@ if [ ! -f "$ESP/EFI/bootlogo-forge/logo.bmp" ]; then
     echo "install did not write logo.bmp" >&2
     exit 1
 fi
+cp "$ESP/EFI/bootlogo-forge/bootlogo-forge-efi.efi" "$ESP/EFI/BOOT/BOOTX64.EFI"
 
 run_case() {
     local case_name="$1"
