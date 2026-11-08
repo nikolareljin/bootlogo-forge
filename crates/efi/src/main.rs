@@ -12,6 +12,9 @@ mod imp {
     use uefi::boot::{self, AllocateType, ScopedProtocol};
     use uefi::fs::FileSystem;
     use uefi::proto::console::gop::GraphicsOutput;
+    use uefi::proto::device_path::build;
+    use uefi::proto::device_path::build::DevicePathBuilder;
+    use uefi::proto::device_path::DevicePath;
     use uefi::proto::media::fs::SimpleFileSystem;
     use uefi::{CString16, Handle, Status};
     use uefi_raw::table::boot::MemoryType;
@@ -47,13 +50,14 @@ mod imp {
         let (image_w, image_h) = bmp_dimensions(&bmp).ok_or(())?;
 
         let pages = bmp.len().div_ceil(4096);
-        let image_addr: u64 = boot::allocate_pages(
+        let image_addr: u64 = match boot::allocate_pages(
             AllocateType::AnyPages,
             MemoryType::RUNTIME_SERVICES_DATA,
             pages,
-        )
-        .map_err(|_| ())?
-        .as_ptr() as u64;
+        ) {
+            Ok(p) => p.as_ptr() as u64,
+            Err(_) => return Err(()),
+        };
         // SAFETY: memory was just allocated for the full BMP.
         unsafe {
             ptr::write_bytes(image_addr as *mut u8, 0, pages * 4096);
@@ -62,13 +66,22 @@ mod imp {
 
         let table_bytes = build_bgrt(image_addr, image_w, image_h, screen_w, screen_h);
         let table_pages = table_bytes.len().div_ceil(4096);
-        let table_addr: u64 = boot::allocate_pages(
+        let table_addr: u64 = match boot::allocate_pages(
             AllocateType::AnyPages,
             MemoryType::RUNTIME_SERVICES_DATA,
             table_pages,
-        )
-        .map_err(|_| ())?
-        .as_ptr() as u64;
+        ) {
+            Ok(p) => p.as_ptr() as u64,
+            Err(_) => {
+                unsafe {
+                    let _ = boot::free_pages(
+                        core::ptr::NonNull::new_unchecked(image_addr as *mut u8),
+                        pages,
+                    );
+                };
+                return Err(());
+            }
+        };
         // SAFETY: memory was just allocated for the BGRT table.
         unsafe {
             ptr::write_bytes(table_addr as *mut u8, 0, table_pages * 4096);
@@ -79,7 +92,21 @@ mod imp {
             );
         }
 
-        update_xsdt(table_addr).map_err(|_| ())?;
+        if let Err(()) = update_xsdt(table_addr) {
+            unsafe {
+                let _ = boot::free_pages(
+                    core::ptr::NonNull::new_unchecked(table_addr as *mut u8),
+                    table_pages,
+                );
+            };
+            unsafe {
+                let _ = boot::free_pages(
+                    core::ptr::NonNull::new_unchecked(image_addr as *mut u8),
+                    pages,
+                );
+            };
+            return Err(());
+        }
         let _ = BGRT_LEN;
         Ok(())
     }
@@ -114,7 +141,7 @@ mod imp {
             return None;
         }
         let w = u32::from_le_bytes(bmp[18..22].try_into().ok()?);
-        let h = u32::from_le_bytes(bmp[22..26].try_into().ok()?);
+        let h = i32::from_le_bytes(bmp[22..26].try_into().ok()?).unsigned_abs();
         if w == 0 || h == 0 {
             return None;
         }
@@ -148,6 +175,11 @@ mod imp {
             }
         }
         if rsdp_addr == 0 {
+            return Err(());
+        }
+        // SAFETY: RSDP from firmware.
+        let rsdp_revision = unsafe { *(rsdp_addr as *const u8).add(15) };
+        if rsdp_revision < 2 {
             return Err(());
         }
 
@@ -260,16 +292,65 @@ mod imp {
     }
 
     fn chain_loader(image_handle: Handle, path: &str) -> Status {
-        if let Some(data) = read_file(image_handle, path) {
-            let source = uefi::boot::LoadImageSource::FromBuffer {
-                buffer: data.as_slice(),
-                file_path: None,
-            };
-            if let Ok(handle) = boot::load_image(image_handle, source) {
-                let _ = boot::start_image(handle);
+        let data = match read_file(image_handle, path) {
+            Some(d) => d,
+            None => return Status::NOT_FOUND,
+        };
+
+        // Try to boot through the filesystem so LoadedImage keeps a device path,
+        // which lets the chained loader find sibling files like grubx64.efi.
+        let cpath = match CString16::try_from(path) {
+            Ok(v) => v,
+            Err(_) => return Status::INVALID_PARAMETER,
+        };
+        if let Ok(loaded) =
+            boot::open_protocol_exclusive::<uefi::proto::loaded_image::LoadedImage>(image_handle)
+        {
+            if let Some(dev) = loaded.device() {
+                if let Ok(base_dp) = boot::open_protocol_exclusive::<DevicePath>(dev) {
+                    let mut buf = [core::mem::MaybeUninit::uninit(); 256];
+                    if let Ok(file_node_path) = DevicePathBuilder::with_buf(&mut buf)
+                        .push(&build::media::FilePath { path_name: &cpath })
+                        .and_then(|b| b.finalize())
+                    {
+                        if let Ok(util_handle) = boot::get_handle_for_protocol::<
+                            uefi::proto::device_path::util::DevicePathUtilities,
+                        >() {
+                            if let Ok(util) = boot::open_protocol_exclusive::<
+                                uefi::proto::device_path::util::DevicePathUtilities,
+                            >(util_handle)
+                            {
+                                if let Ok(appended) = util.append_path(&base_dp, file_node_path) {
+                                    if let Ok(handle) = boot::load_image(
+                                        image_handle,
+                                        uefi::boot::LoadImageSource::FromDevicePath {
+                                            device_path: &appended,
+                                            boot_policy: uefi::proto::BootPolicy::BootSelection,
+                                        },
+                                    ) {
+                                        let _ = boot::start_image(handle);
+                                        return Status::SUCCESS;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-        Status::SUCCESS
+
+        // Fall back to loading from the already-read buffer.
+        let source = uefi::boot::LoadImageSource::FromBuffer {
+            buffer: data.as_slice(),
+            file_path: None,
+        };
+        match boot::load_image(image_handle, source) {
+            Ok(handle) => {
+                let _ = boot::start_image(handle);
+                Status::SUCCESS
+            }
+            Err(_) => Status::LOAD_ERROR,
+        }
     }
 }
 
