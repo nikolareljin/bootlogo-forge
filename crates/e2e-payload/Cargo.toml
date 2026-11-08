@@ -1,0 +1,13 @@
+[package]
+name = "bootlogo-forge-e2e-payload"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[[bin]]
+name = "payload"
+path = "src/main.rs"
+
+[dependencies]
+uefi = { version = "0.41", default-features = false, features = ["alloc", "global_allocator", "panic_handler"] }
+uefi-raw = "0.17"

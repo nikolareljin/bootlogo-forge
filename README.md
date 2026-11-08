@@ -9,7 +9,7 @@ The logo drawn by the firmware itself, before the OS loader runs, lives inside t
 firmware image. bootlogo-forge never reads or writes firmware. The first logo you
 see during POST stays. The new logo appears once the EFI application runs and
 publishes an ACPI BGRT table, and remains visible through Plymouth and Windows
-through their BGRT handling. firmware update may replace the firmware logo.
+through their BGRT handling. A firmware update may replace the firmware logo.
 
 ## How it works
 
@@ -18,15 +18,13 @@ through their BGRT handling. firmware update may replace the firmware logo.
 2. If anything fails in the EFI application, it chains to the original loader
    unchanged and the machine still boots.
 
-## Status
+## Requirements
 
-Acer first. Lenovo, Dell and HP get the BGRT path.
+- Acer first. Lenovo, Dell and HP use the BGRT path.
+- Secure Boot off, or enrollment of the binary hash via MOK (not automated).
+- ACPI BGRT present.
 
 ## Usage
-
-See the installed help:
-
-    bootlogo-forge --help
 
 Detection:
 
@@ -34,16 +32,37 @@ Detection:
 
 Install (dry run; add --apply to change anything):
 
-    bootlogo-forge install --image ./logo.png
+    sudo bootlogo-forge install --image ./logo.png --plymouth --apply
+
+The laptop model is not required. The command saves the previous boot order,
+installs the EFI application, converts the image to BMP, and (with --plymouth)
+sets the Plymouth bgrt theme.
 
 Uninstall:
 
-    bootlogo-forge uninstall
+    sudo bootlogo-forge uninstall --apply
 
 Status:
 
     bootlogo-forge status
 
-Supported vendors: acer, lenovo, dell, hp, unknown.
-Uninstall restores the saved boot order. Firmware boot menu (F12 on Acer)
-acts as recovery.
+## Recovery
+
+If the boot entry fails, open the firmware boot menu (F12 on Acer) and select the
+original boot entry. Uninstall restores the saved boot order.
+
+## Secure Boot
+
+The binary is not signed automatically. Use a Machine Owner Key (MOK) to enroll
+its hash with mokutil, or disable Secure Boot. Signing automation is not provided.
+
+## Supported vendors
+
+| Vendor | Path | Status |
+| --- | --- | --- |
+| Acer | BGRT | tested in QEMU only |
+| Lenovo | BGRT (native ESP logo documented, opt-in) | tested in QEMU only |
+| Dell | BGRT | tested in QEMU only |
+| HP | BGRT | tested in QEMU only |
+
+No others are supported.

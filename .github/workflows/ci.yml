@@ -56,3 +56,14 @@ jobs:
           components: rustfmt, clippy
           targets: x86_64-unknown-uefi
       - run: cargo build -p bootlogo-forge-efi --target x86_64-unknown-uefi
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: stable
+          targets: x86_64-unknown-uefi
+      - run: sudo apt-get update && sudo apt-get install -y qemu-system-x86 ovmf
+      - run: bash scripts/e2e_qemu.sh

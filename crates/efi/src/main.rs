@@ -152,7 +152,13 @@ mod imp {
         }
 
         // SAFETY: RSDP physical address from firmware table.
-        let xsdt_addr = unsafe { *((rsdp_addr + 24) as *const u64) };
+        let xsdt_addr = unsafe {
+            u64::from_le_bytes(
+                core::slice::from_raw_parts((rsdp_addr + 24) as *const u8, 8)
+                    .try_into()
+                    .unwrap(),
+            )
+        };
         if xsdt_addr == 0 {
             return Err(());
         }
@@ -171,8 +177,13 @@ mod imp {
 
             let mut entries: Vec<u64> = Vec::with_capacity(entry_count + 1);
             for i in 0..entry_count {
-                let p = (xsdt_addr as usize + 36 + i * 8) as *const u64;
-                entries.push(*p);
+                let addr = xsdt_addr as usize + 36 + i * 8;
+                let val = u64::from_le_bytes(
+                    core::slice::from_raw_parts(addr as *const u8, 8)
+                        .try_into()
+                        .unwrap(),
+                );
+                entries.push(val);
             }
 
             let mut new_entries: Vec<u64> = Vec::new();
@@ -207,8 +218,9 @@ mod imp {
             ptr::copy_nonoverlapping(len_bytes.as_ptr(), (new_xsdt as *mut u8).add(4), 4);
 
             for (i, &e) in new_entries.iter().enumerate() {
-                let dst = (new_xsdt as usize + 36 + i * 8) as *mut u64;
-                *dst = e;
+                let dst = (new_xsdt as usize + 36 + i * 8) as *mut u8;
+                let bytes = e.to_le_bytes();
+                core::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, 8);
             }
 
             {
