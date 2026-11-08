@@ -41,6 +41,12 @@ enum Commands {
         esp: Option<PathBuf>,
         #[arg(long, default_value = "/usr/bin/efibootmgr")]
         efibootmgr: PathBuf,
+        #[arg(long, default_value = "/usr/bin/findmnt")]
+        findmnt: PathBuf,
+        #[arg(long, default_value = "/usr/bin/lsblk")]
+        lsblk: PathBuf,
+        #[arg(long)]
+        resolution: Option<String>,
         #[arg(long)]
         efi_app: Option<PathBuf>,
         #[arg(long, default_value = "/usr/bin/plymouth-set-default-theme")]
@@ -125,6 +131,9 @@ fn main() -> ExitCode {
             image,
             esp,
             efibootmgr,
+            findmnt,
+            lsblk,
+            resolution,
             efi_app,
             plymouth_set_default_theme,
             update_initramfs,
@@ -146,11 +155,33 @@ fn main() -> ExitCode {
                     bootlogo_forge::findmnt_esp().unwrap_or_else(|| PathBuf::from("/boot/efi"))
                 }
             });
+            let parsed_resolution = match resolution {
+                Some(value) => {
+                    let parts: Vec<&str> = value.split('x').collect();
+                    if parts.len() != 2 {
+                        eprintln!("invalid resolution: {}", value);
+                        return ExitCode::FAILURE;
+                    }
+                    match (parts[0].parse::<u32>(), parts[1].parse::<u32>()) {
+                        (Ok(w), Ok(h)) if w > 0 && h > 0 => Some((w, h)),
+                        _ => {
+                            eprintln!("invalid resolution: {}", value);
+                            return ExitCode::FAILURE;
+                        }
+                    }
+                }
+                None => None,
+            };
             let opts = InstallOptions {
                 image,
                 esp: esp_path.clone(),
                 efibootmgr,
                 efi_app,
+                findmnt,
+                lsblk,
+                resolution: parsed_resolution,
+                esp_disk: None,
+                esp_part: None,
                 dry_run: !apply,
                 apply,
                 is_root: is_root(),

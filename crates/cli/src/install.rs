@@ -4,6 +4,7 @@ use std::process::Command;
 
 pub const ENTRY_LABEL: &str = "bootlogo-forge";
 pub const EFI_APP_NAME: &str = "bootlogo-forge-efi.efi";
+pub const EFI_ENTRY_LOADER: &str = "\\EFI\\bootlogo-forge\\bootlogo-forge-efi.efi";
 pub const LOGO_NAME: &str = "logo.bmp";
 pub const CONFIG_NAME: &str = "config";
 pub const BACKUP_NAME: &str = "backup.json";
@@ -18,6 +19,7 @@ pub enum InstallError {
     Efibootmgr(String),
     Parse(String),
     MissingEfiApp,
+    EspDevice(String),
 }
 
 impl std::fmt::Display for InstallError {
@@ -31,6 +33,7 @@ impl std::fmt::Display for InstallError {
             Self::Efibootmgr(m) => write!(f, "efibootmgr failed: {}", m),
             Self::Parse(m) => write!(f, "parse error: {}", m),
             Self::MissingEfiApp => f.write_str("EFI application binary not found"),
+            Self::EspDevice(m) => write!(f, "could not resolve ESP block device: {}", m),
         }
     }
 }
@@ -43,6 +46,11 @@ pub struct InstallOptions {
     pub esp: PathBuf,
     pub efibootmgr: PathBuf,
     pub efi_app: Option<PathBuf>,
+    pub findmnt: PathBuf,
+    pub lsblk: PathBuf,
+    pub resolution: Option<(u32, u32)>,
+    pub esp_disk: Option<PathBuf>,
+    pub esp_part: Option<u32>,
     pub dry_run: bool,
     pub apply: bool,
     pub is_root: bool,
@@ -165,6 +173,92 @@ fn read_sysfs_value(root: &Path, name: &str) -> String {
         .unwrap_or_else(|| String::from("unknown"))
 }
 
+fn parse_trailing_number(s: &str) -> Option<u32> {
+    let mut i = s.len();
+    while i > 0 && s.as_bytes()[i - 1].is_ascii_digit() {
+        i -= 1;
+    }
+    if i == s.len() {
+        None
+    } else {
+        s[i..].parse().ok()
+    }
+}
+
+pub fn resolve_esp_device(
+    esp: &Path,
+    findmnt: &Path,
+    lsblk: &Path,
+) -> Result<(PathBuf, u32), InstallError> {
+    let output = Command::new(findmnt)
+        .args(["-rn", "-o", "SOURCE", "--target"])
+        .arg(esp)
+        .output()
+        .map_err(|e| InstallError::EspDevice(e.to_string()))?;
+    if !output.status.success() {
+        return Err(InstallError::EspDevice(
+            String::from_utf8_lossy(&output.stderr).trim().to_string(),
+        ));
+    }
+    let source = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if source.is_empty() {
+        return Err(InstallError::EspDevice(String::from("no source for ESP")));
+    }
+    let dev = if source.starts_with("/dev/") {
+        source
+    } else {
+        format!("/dev/{}", source)
+    };
+
+    let pk_out = Command::new(lsblk)
+        .args(["-rn", "-o", "PKNAME"])
+        .arg(&dev)
+        .output()
+        .map_err(|e| InstallError::EspDevice(e.to_string()))?;
+    let pk = String::from_utf8_lossy(&pk_out.stdout)
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
+    if pk.is_empty() {
+        return Err(InstallError::EspDevice(String::from(
+            "could not find parent disk",
+        )));
+    }
+    let part = parse_trailing_number(&dev).ok_or_else(|| {
+        InstallError::EspDevice(String::from("could not parse partition number"))
+    })?;
+    Ok((PathBuf::from(format!("/dev/{}", pk)), part))
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct Backup {
+    boot_order: Vec<String>,
+    created_entry: String,
+    loader: String,
+}
+
+fn default_resolution() -> (u32, u32) {
+    if let Ok(text) = fs::read_to_string("/sys/class/graphics/fb0/virtual_size") {
+        let t = text.trim().replace(',', "x");
+        let parts: Vec<&str> = t.split('x').collect();
+        if parts.len() == 2 {
+            if let (Ok(w), Ok(h)) = (parts[0].parse(), parts[1].parse()) {
+                if w > 0 && h > 0 {
+                    return (w, h);
+                }
+            }
+        }
+    }
+    (1920, 1080)
+}
+
 pub fn install(opts: InstallOptions) -> Result<Vec<String>, InstallError> {
     let mut actions = Vec::new();
     if !opts.esp.is_dir() {
@@ -210,10 +304,12 @@ pub fn install(opts: InstallOptions) -> Result<Vec<String>, InstallError> {
     let input = fs::read(&opts.image).map_err(|e| InstallError::Image(e.to_string()))?;
     let decoded_dims = bootlogo_forge_core::parse_dimensions(&input)
         .map_err(|e| InstallError::Image(e.to_string()))?;
-    let bmp = bootlogo_forge_core::render_bmp(&input, decoded_dims.0, decoded_dims.1)
+    let _ = decoded_dims;
+    let (target_w, target_h) = opts.resolution.unwrap_or_else(default_resolution);
+    let bmp = bootlogo_forge_core::render_bmp(&input, target_w, target_h)
         .map_err(|e| InstallError::Image(e.to_string()))?;
 
-    let loader = detect_loader(&opts.esp);
+    let chain_loader = detect_loader(&opts.esp);
 
     actions.push(format!(
         "convert image to {}",
@@ -223,11 +319,16 @@ pub fn install(opts: InstallOptions) -> Result<Vec<String>, InstallError> {
         "copy EFI app to {}",
         target_dir.join(EFI_APP_NAME).display()
     ));
-    actions.push(format!("write config targeting {}", loader));
+    actions.push(format!("write config targeting {}", chain_loader));
     actions.push(format!(
         "create or reuse boot entry labeled {}",
         ENTRY_LABEL
     ));
+
+    let (esp_disk, esp_part) = match (&opts.esp_disk, opts.esp_part) {
+        (Some(d), Some(p)) => (d.clone(), p),
+        _ => resolve_esp_device(&opts.esp, &opts.findmnt, &opts.lsblk)?,
+    };
 
     if opts.dry_run {
         actions.push(format!(
@@ -248,8 +349,19 @@ pub fn install(opts: InstallOptions) -> Result<Vec<String>, InstallError> {
     let apply_result = (|| -> Result<(), InstallError> {
         fs::create_dir_all(&target_dir).map_err(io_err)?;
         // backup previous boot order before changes
-        let original_order = get_boot_order(&opts.efibootmgr)?;
-        let existing = find_entry_number(&opts.efibootmgr, ENTRY_LABEL, &loader);
+        let backup_path = target_dir.join(BACKUP_NAME);
+        let backup_existed = backup_path.exists();
+        let original_order = if backup_existed {
+            match fs::read_to_string(&backup_path) {
+                Ok(text) => serde_json::from_str::<Backup>(&text)
+                    .map(|b| b.boot_order)
+                    .unwrap_or_default(),
+                Err(_) => Vec::new(),
+            }
+        } else {
+            get_boot_order(&opts.efibootmgr)?
+        };
+        let existing = find_entry_number(&opts.efibootmgr, ENTRY_LABEL, EFI_ENTRY_LOADER);
         let created = if let Some(e) = existing {
             e
         } else {
@@ -257,32 +369,35 @@ pub fn install(opts: InstallOptions) -> Result<Vec<String>, InstallError> {
                 &opts.efibootmgr,
                 &[
                     String::from("--create"),
+                    String::from("--disk"),
+                    esp_disk.display().to_string(),
+                    String::from("--part"),
+                    esp_part.to_string(),
                     String::from("--label"),
                     String::from(ENTRY_LABEL),
                     String::from("--loader"),
-                    loader.clone(),
+                    String::from(EFI_ENTRY_LOADER),
                 ],
                 true,
             )?;
-            find_entry_number(&opts.efibootmgr, ENTRY_LABEL, &loader)
+            find_entry_number(&opts.efibootmgr, ENTRY_LABEL, EFI_ENTRY_LOADER)
                 .ok_or_else(|| InstallError::Parse(String::from("created entry not found")))?
         };
-        let backup = format!(
-            r#"{{"boot_order":[{}],"created_entry":"{}","loader":"{}"}}"#,
-            original_order
-                .iter()
-                .map(|s| format!(r#""{}""#, s))
-                .collect::<Vec<_>>()
-                .join(","),
-            created,
-            loader.replace('\\', "\\\\"),
-        );
-        fs::write(target_dir.join(BACKUP_NAME), backup).map_err(io_err)?;
+        if !backup_existed {
+            let backup = Backup {
+                boot_order: original_order.clone(),
+                created_entry: created.clone(),
+                loader: chain_loader.clone(),
+            };
+            let payload = serde_json::to_string(&backup)
+                .map_err(|e| InstallError::Parse(e.to_string()))?;
+            fs::write(&backup_path, payload).map_err(io_err)?;
+        }
 
         // copy files
         fs::copy(&efi_app, target_dir.join(EFI_APP_NAME)).map_err(io_err)?;
         fs::write(target_dir.join(LOGO_NAME), &bmp).map_err(io_err)?;
-        fs::write(target_dir.join(CONFIG_NAME), format!("loader={}\n", loader)).map_err(io_err)?;
+        fs::write(target_dir.join(CONFIG_NAME), format!("loader={}\n", chain_loader)).map_err(io_err)?;
 
         // set boot order
         let mut new_order = vec![created.clone()];
@@ -328,17 +443,15 @@ pub fn uninstall(opts: UninstallOptions) -> Result<Vec<String>, InstallError> {
     // read backup
     let backup_path = target_dir.join(BACKUP_NAME);
     let backup = fs::read_to_string(&backup_path).ok();
-    let (original_order, created_entry, loader): (Vec<String>, Option<String>, Option<String>) =
+    let (original_order, created_entry, _): (Vec<String>, Option<String>, Option<String>) =
         if let Some(text) = backup {
-            let order = parse_json_array(&text, "boot_order");
-            let entry = parse_json_string(&text, "created_entry");
-            let loader = parse_json_string(&text, "loader");
-            (order, entry, loader)
+            match serde_json::from_str::<Backup>(&text) {
+                Ok(b) => (b.boot_order, Some(b.created_entry), Some(b.loader)),
+                Err(_) => (Vec::new(), None, None),
+            }
         } else {
             (Vec::new(), None, None)
         };
-
-    let loader = loader.unwrap_or_else(|| detect_loader(&opts.esp));
 
     actions.push(String::from("restore boot order"));
     actions.push(format!("remove entry labeled {}", ENTRY_LABEL));
@@ -356,22 +469,22 @@ pub fn uninstall(opts: UninstallOptions) -> Result<Vec<String>, InstallError> {
 
     // delete matching entry
     let entry_to_delete =
-        created_entry.or_else(|| find_entry_number(&opts.efibootmgr, ENTRY_LABEL, &loader));
+        created_entry.or_else(|| find_entry_number(&opts.efibootmgr, ENTRY_LABEL, EFI_ENTRY_LOADER));
     if let Some(entry) = &entry_to_delete {
-        let _ = mutate(
+        mutate(
             &opts.efibootmgr,
             &[String::from("-B"), String::from("-b"), entry.clone()],
             true,
-        );
+        )?;
     }
     if !original_order.is_empty() {
-        let _ = mutate(
+        mutate(
             &opts.efibootmgr,
             &[String::from("-o"), original_order.join(",")],
             true,
-        );
+        )?;
     }
-    let _ = fs::remove_dir_all(&target_dir);
+    fs::remove_dir_all(&target_dir).map_err(io_err)?;
     actions.push(String::from("uninstall complete"));
     Ok(actions)
 }
@@ -427,32 +540,7 @@ pub fn findmnt_esp() -> Option<PathBuf> {
     }
 }
 
-fn parse_json_array(text: &str, key: &str) -> Vec<String> {
-    let n1 = format!("\"{}\": [", key);
-    let n2 = format!("\"{}\": [", key);
-    for needle in [n1, n2] {
-        if let Some(pos) = text.find(&needle) {
-            let rest = &text[pos + needle.len()..];
-            if let Some(end) = rest.find(']') {
-                let body = &rest[..end];
-                return body
-                    .split(',')
-                    .map(|s| s.trim().trim_matches('"').to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect();
-            }
-        }
-    }
-    Vec::new()
-}
 
-fn parse_json_string(text: &str, key: &str) -> Option<String> {
-    let needle = format!(r#""{}":""#, key);
-    let pos = text.find(&needle)?;
-    let rest = &text[pos + needle.len()..];
-    let end = rest.find('"')?;
-    Some(rest[..end].replace("\\\\", "\\"))
-}
 
 #[cfg(test)]
 mod tests {
@@ -486,7 +574,7 @@ mod tests {
             format!("#!/bin/sh\necho \"$@\" >> '{}'\nexit 1\n", record.display())
         } else {
             format!(
-                "#!/bin/sh\necho \"$@\" >> '{}'\ncat <<'EOF'\nBootCurrent: 0000\nTimeout: 2 seconds\nBootOrder: 0000\nBoot0000* ubuntu\nBoot{}* {} /EFI/ubuntu/shimx64.efi\nEOF\nexit 0\n",
+                "#!/bin/sh\necho \"$@\" >> '{}'\ncat <<'EOF'\nBootCurrent: 0000\nTimeout: 2 seconds\nBootOrder: 0000\nBoot0000* ubuntu\nBoot{}* {} /EFI/bootlogo-forge/bootlogo-forge-efi.efi\nEOF\nexit 0\n",
                 record.display(),
                 entry,
                 ENTRY_LABEL
@@ -517,6 +605,11 @@ mod tests {
             image: image_path.clone(),
             esp: esp.clone(),
             efibootmgr: stub.clone(),
+            findmnt: base.join("findmnt"),
+            lsblk: base.join("lsblk"),
+            resolution: None,
+            esp_disk: Some(PathBuf::from("/dev/sda")),
+            esp_part: Some(1),
             efi_app: Some(efi_app),
             dry_run: false,
             apply: true,
@@ -534,6 +627,11 @@ mod tests {
             image: image_path.clone(),
             esp: esp.clone(),
             efibootmgr: stub.clone(),
+            findmnt: base.join("findmnt"),
+            lsblk: base.join("lsblk"),
+            resolution: None,
+            esp_disk: Some(PathBuf::from("/dev/sda")),
+            esp_part: Some(1),
             efi_app: Some(base.join(EFI_APP_NAME)),
             dry_run: false,
             apply: true,
@@ -559,6 +657,11 @@ mod tests {
             image: base.join("x.png"),
             esp: base.join("nope"),
             efibootmgr: base.join("efi"),
+            findmnt: base.join("findmnt"),
+            lsblk: base.join("lsblk"),
+            resolution: None,
+            esp_disk: None,
+            esp_part: None,
             efi_app: None,
             dry_run: false,
             apply: true,
@@ -577,6 +680,11 @@ mod tests {
             image: base.join("x.png"),
             esp: esp.clone(),
             efibootmgr: base.join("efi"),
+            findmnt: base.join("findmnt"),
+            lsblk: base.join("lsblk"),
+            resolution: None,
+            esp_disk: None,
+            esp_part: None,
             efi_app: None,
             dry_run: false,
             apply: true,
@@ -605,6 +713,11 @@ mod tests {
             image: image_path,
             esp: esp.clone(),
             efibootmgr: stub,
+            findmnt: base.join("findmnt"),
+            lsblk: base.join("lsblk"),
+            resolution: None,
+            esp_disk: Some(PathBuf::from("/dev/sda")),
+            esp_part: Some(1),
             efi_app: Some(efi_app),
             dry_run: false,
             apply: true,
@@ -625,6 +738,11 @@ mod tests {
             image: base.join("x.png"),
             esp,
             efibootmgr: base.join("efi"),
+            findmnt: base.join("findmnt"),
+            lsblk: base.join("lsblk"),
+            resolution: None,
+            esp_disk: None,
+            esp_part: None,
             efi_app: None,
             dry_run: false,
             apply: true,
