@@ -9,4 +9,6 @@
 - Linux CLI: detect, status, install and uninstall with injectable paths and efibootmgr.
 - Optional Plymouth bgrt theme install and restore.
 - QEMU end-to-end test with ACPI BGRT verification and documentation updates.
-- More PRs land in later PRs.
+- Vendor detection chooses the BGRT backend; Lenovo native ESP logo is an opt-in dry-run backend.
+- All PRs land complete.
+- Project logo, README hero, and a static GitHub Pages page.

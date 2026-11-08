@@ -1,3 +1,8 @@
+![bootlogo-forge hero](assets/hero.svg)
+
+> **Work in progress.** This project is unfinished, may change, and is not
+> recommended for production use.
+
 # bootlogo-forge
 
 Replace the boot logo shown after firmware POST on Acer laptops (InsydeH2O firmware,
@@ -20,7 +25,7 @@ through their BGRT handling. A firmware update may replace the firmware logo.
 
 ## Requirements
 
-- Acer first. Lenovo, Dell and HP use the BGRT path.
+- Vendor detection selects the BGRT backend; Lenovo native support is opt-in.
 - Secure Boot off, or enrollment of the binary hash via MOK (not automated).
 - ACPI BGRT present.
 
