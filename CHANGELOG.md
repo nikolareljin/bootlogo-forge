@@ -12,3 +12,4 @@
 - Vendor detection chooses the BGRT backend; Lenovo native ESP logo is an opt-in dry-run backend.
 - All PRs land complete.
 - Project logo, README hero, and a static GitHub Pages page.
+- Google Search Console ownership file at the site root.

@@ -9,6 +9,14 @@ export RUSTC="$(rustup which --toolchain stable rustc)"
 
 mdbook build
 
+# Search Console's ownership file must reach the site root byte for byte.
+VERIFICATION="googlefb1695ee9a07673e.html"
+if [ "$(cat "book/$VERIFICATION" 2>/dev/null; printf x)" != "google-site-verification: ${VERIFICATION}x" ]; then
+    echo "book/$VERIFICATION is missing or altered"
+    exit 1
+fi
+echo "ownership file ok"
+
 python3 - "$ROOT/docs" <<'PY'
 import os, re, sys
 
